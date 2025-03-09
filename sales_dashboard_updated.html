@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Sales Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        h2 {
+            color: #333;
+        }
+        #fileInput {
+            margin-bottom: 20px;
+            padding: 10px;
+        }
+        #charts div {
+            margin: 20px auto;
+            width: 80%;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h2>Sales Performance Dashboard</h2>
+    <input type="file" id="fileInput" accept=".json">
+    <div id="charts">
+        <div id="salesOverTime"></div>
+        <div id="salesByCountry"></div>
+        <div id="salesByProduct"></div>
+        <div id="salesBySalesPerson"></div>
+        <div id="shipmentEfficiency"></div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const salesData = JSON.parse(e.target.result);
+                generateDashboard(salesData);
+            };
+            reader.readAsText(file);
+        });
+
+        function generateDashboard(data) {
+            data.forEach(d => d.Amount = parseFloat(d.Amount.replace(/[$,]/g, '')));
+            
+            function createChart(container, title, trace) {
+                Plotly.newPlot(container, [trace], {
+                    title: title,
+                    paper_bgcolor: '#f4f4f4',
+                    plot_bgcolor: '#fff',
+                    margin: { t: 40, b: 40, l: 50, r: 50 },
+                    font: { size: 14 },
+                    transition: { duration: 500, easing: 'cubic-in-out' }
+                });
+            }
+            
+            let dates = [...new Set(data.map(d => d.Date))].sort();
+            let salesOverTime = dates.map(date => ({ x: date, y: data.filter(d => d.Date === date).reduce((sum, d) => sum + d.Amount, 0) }));
+            createChart('salesOverTime', 'Total Sales Over Time', { x: salesOverTime.map(d => d.x), y: salesOverTime.map(d => d.y), type: 'scatter', mode: 'lines+markers', marker: { size: 8, color: 'blue' } });
+            
+            let countries = [...new Set(data.map(d => d.Country))];
+            let salesByCountry = countries.map(country => ({ x: country, y: data.filter(d => d.Country === country).reduce((sum, d) => sum + d.Amount, 0) }));
+            createChart('salesByCountry', 'Sales by Country', { x: salesByCountry.map(d => d.x), y: salesByCountry.map(d => d.y), type: 'bar', marker: { color: 'green' } });
+            
+            let products = [...new Set(data.map(d => d.Product))];
+            let salesByProduct = products.map(product => ({ x: product, y: data.filter(d => d.Product === product).reduce((sum, d) => sum + d.Amount, 0) }));
+            createChart('salesByProduct', 'Sales by Product', { x: salesByProduct.map(d => d.x), y: salesByProduct.map(d => d.y), type: 'bar', marker: { color: 'orange' } });
+            
+            let salesPeople = [...new Set(data.map(d => d["Sales Person"]))];
+            let salesBySalesPerson = salesPeople.map(person => ({ x: person, y: data.filter(d => d["Sales Person"] === person).reduce((sum, d) => sum + d.Amount, 0) }));
+            createChart('salesBySalesPerson', 'Sales by Salesperson', { x: salesBySalesPerson.map(d => d.x), y: salesBySalesPerson.map(d => d.y), type: 'bar', marker: { color: 'purple' } });
+            
+            let shipments = data.map(d => ({ x: d["Boxes Shipped"], y: d.Amount }));
+            createChart('shipmentEfficiency', 'Shipment Efficiency (Boxes vs. Revenue)', { x: shipments.map(d => d.x), y: shipments.map(d => d.y), mode: 'markers', type: 'scatter', marker: { size: 10, color: 'red', opacity: 0.6 } });
+        }
+    </script>
+</body>
+</html>
