@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Sales Dashboard</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <title>Generic JSON Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         /* General Styles */
         body {
@@ -51,14 +51,14 @@
 
         /* Main Content */
         .main-content {
-            margin-left: 250px;
-            padding: 20px;
+            margin-left: 270px; /* Adjusted to prevent overlap with sidebar */
+            padding: 30px 20px; /* Added more padding for better spacing */
         }
 
         .chart-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); /* Wider charts */
+            gap: 30px; /* Increased gap between charts */
         }
 
         .chart-card {
@@ -78,86 +78,130 @@
             margin-top: 0;
             color: #2c3e50;
         }
+
+        /* Chart Container */
+        .chart-container {
+            width: 100%;
+            height: 400px; /* Fixed height for charts */
+        }
     </style>
 </head>
 <body>
     <!-- Sidebar -->
     <div class="sidebar">
-        <h2>Sales Dashboard</h2>
+        <h2>JSON Dashboard</h2>
         <input type="file" id="fileInput" accept=".json">
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
-        <h2>Sales Performance Overview</h2>
-        <div class="chart-grid">
-            <div class="chart-card">
-                <h3>Total Sales Over Time</h3>
-                <div id="salesOverTime"></div>
-            </div>
-            <div class="chart-card">
-                <h3>Sales by Country</h3>
-                <div id="salesByCountry"></div>
-            </div>
-            <div class="chart-card">
-                <h3>Sales by Product</h3>
-                <div id="salesByProduct"></div>
-            </div>
-            <div class="chart-card">
-                <h3>Sales by Salesperson</h3>
-                <div id="salesBySalesPerson"></div>
-            </div>
-            <div class="chart-card">
-                <h3>Shipment Efficiency</h3>
-                <div id="shipmentEfficiency"></div>
-            </div>
-        </div>
+        <h2>Data Overview</h2>
+        <div class="chart-grid" id="charts"></div>
     </div>
 
     <script>
         document.getElementById('fileInput').addEventListener('change', function(event) {
             const file = event.target.files[0];
-            if (!file) return;
+            if (!file) {
+                console.log("No file selected.");
+                return;
+            }
             const reader = new FileReader();
             reader.onload = function(e) {
-                const salesData = JSON.parse(e.target.result);
-                generateDashboard(salesData);
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    console.log("JSON Data Loaded:", jsonData);
+                    generateDashboard(jsonData);
+                } catch (error) {
+                    console.error("Error parsing JSON:", error);
+                    alert("Invalid JSON file. Please upload a valid JSON file.");
+                }
             };
             reader.readAsText(file);
         });
 
         function generateDashboard(data) {
-            data.forEach(d => d.Amount = parseFloat(d.Amount.replace(/[$,]/g, '')));
-            
-            function createChart(container, title, trace) {
-                Plotly.newPlot(container, [trace], {
-                    title: title,
-                    paper_bgcolor: '#f4f7f6',
-                    plot_bgcolor: '#fff',
-                    margin: { t: 40, b: 40, l: 50, r: 50 },
-                    font: { size: 14 },
-                    transition: { duration: 500, easing: 'cubic-in-out' }
-                });
+            const chartsContainer = document.getElementById('charts');
+            chartsContainer.innerHTML = ''; // Clear previous charts
+
+            if (!Array.isArray(data) || data.length === 0) {
+                console.log("No data available or invalid JSON format.");
+                chartsContainer.innerHTML = '<p>No data available or invalid JSON format.</p>';
+                return;
             }
-            
-            let dates = [...new Set(data.map(d => d.Date))].sort();
-            let salesOverTime = dates.map(date => ({ x: date, y: data.filter(d => d.Date === date).reduce((sum, d) => sum + d.Amount, 0) }));
-            createChart('salesOverTime', '', { x: salesOverTime.map(d => d.x), y: salesOverTime.map(d => d.y), type: 'scatter', mode: 'lines+markers', marker: { size: 8, color: '#3498db' } });
-            
-            let countries = [...new Set(data.map(d => d.Country))];
-            let salesByCountry = countries.map(country => ({ x: country, y: data.filter(d => d.Country === country).reduce((sum, d) => sum + d.Amount, 0) }));
-            createChart('salesByCountry', '', { x: salesByCountry.map(d => d.x), y: salesByCountry.map(d => d.y), type: 'bar', marker: { color: '#2ecc71' } });
-            
-            let products = [...new Set(data.map(d => d.Product))];
-            let salesByProduct = products.map(product => ({ x: product, y: data.filter(d => d.Product === product).reduce((sum, d) => sum + d.Amount, 0) }));
-            createChart('salesByProduct', '', { x: salesByProduct.map(d => d.x), y: salesByProduct.map(d => d.y), type: 'bar', marker: { color: '#e67e22' } });
-            
-            let salesPeople = [...new Set(data.map(d => d["Sales Person"]))];
-            let salesBySalesPerson = salesPeople.map(person => ({ x: person, y: data.filter(d => d["Sales Person"] === person).reduce((sum, d) => sum + d.Amount, 0) }));
-            createChart('salesBySalesPerson', '', { x: salesBySalesPerson.map(d => d.x), y: salesBySalesPerson.map(d => d.y), type: 'bar', marker: { color: '#9b59b6' } });
-            
-            let shipments = data.map(d => ({ x: d["Boxes Shipped"], y: d.Amount }));
-            createChart('shipmentEfficiency', '', { x: shipments.map(d => d.x), y: shipments.map(d => d.y), mode: 'markers', type: 'scatter', marker: { size: 10, color: '#e74c3c', opacity: 0.6 } });
+
+            const firstRow = data[0];
+            const keys = Object.keys(firstRow);
+            console.log("Keys in JSON:", keys);
+
+            keys.forEach(key => {
+                const values = data.map(row => row[key]);
+                console.log(`Values for ${key}:`, values);
+
+                // Check if the key's values are numeric
+                const isNumeric = values.every(val => !isNaN(parseFloat(val))) && values.some(val => val !== null && val !== "");
+                console.log(`Is ${key} numeric?`, isNumeric);
+
+                if (isNumeric) {
+                    // Create a histogram for numeric data
+                    const trace = {
+                        x: values,
+                        type: 'histogram',
+                        marker: { color: '#3498db' }
+                    };
+                    createChart(key, 'Distribution of ' + key, trace);
+                } else {
+                    // Create a bar chart for categorical data
+                    const uniqueValues = [...new Set(values)];
+                    const counts = uniqueValues.map(val => values.filter(v => v === val).length);
+                    console.log(`Unique values for ${key}:`, uniqueValues);
+                    console.log(`Counts for ${key}:`, counts);
+
+                    const trace = {
+                        x: uniqueValues,
+                        y: counts,
+                        type: 'bar',
+                        marker: { color: '#2ecc71' }
+                    };
+                    createChart(key, 'Frequency of ' + key, trace);
+                }
+            });
+
+            // Check for relationships between numeric columns
+            const numericKeys = keys.filter(key => {
+                return data.every(row => !isNaN(parseFloat(row[key]))) && data.some(row => row[key] !== null && row[key] !== "");
+            });
+            console.log("Numeric keys:", numericKeys);
+
+            if (numericKeys.length >= 2) {
+                const xKey = numericKeys[0];
+                const yKey = numericKeys[1];
+                const trace = {
+                    x: data.map(row => parseFloat(row[xKey])),
+                    y: data.map(row => parseFloat(row[yKey])),
+                    mode: 'markers',
+                    type: 'scatter',
+                    marker: { size: 10, color: '#e74c3c', opacity: 0.6 }
+                };
+                createChart('scatter', `Relationship between ${xKey} and ${yKey}`, trace);
+            }
+        }
+
+        function createChart(id, title, trace) {
+            const chartCard = document.createElement('div');
+            chartCard.className = 'chart-card';
+            chartCard.innerHTML = `<h3>${title}</h3><div class="chart-container" id="${id}"></div>`;
+            document.getElementById('charts').appendChild(chartCard);
+
+            Plotly.newPlot(id, [trace], {
+                title: title,
+                paper_bgcolor: '#f4f7f6',
+                plot_bgcolor: '#fff',
+                margin: { t: 40, b: 40, l: 50, r: 50 },
+                font: { size: 14 },
+                width: 600, // Fixed width for charts
+                height: 400 // Fixed height for charts
+            });
         }
     </script>
 </body>
